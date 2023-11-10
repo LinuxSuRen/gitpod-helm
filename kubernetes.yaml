@@ -1,0 +1,75 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitpod
+  namespace: argo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitpod
+  template:
+    metadata:
+      labels:
+        app: gitpod
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: gitpod
+              topologyKey: kubernetes.io/hostname
+            weight: 5
+      containers:
+      - image: 172.11.0.6:30002/docker.io/gitpod/openvscode-server:1.84.0
+        name: gitpod
+        ports:
+        - containerPort: 3000
+          name: web
+        securityContext:
+          allowPrivilegeEscalation: true
+          readOnlyRootFilesystem: true
+          runAsNonRoot: false
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /home/workspace
+          name: workspace
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: false
+      volumes:
+      - name: workspace
+        persistentVolumeClaim:
+          claimName: gitpod
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitpod
+  namespace: argo
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 8Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitpod
+  namespace: argo
+spec:
+  ports:
+  - name: web
+    port: 3000
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: gitpod
+  sessionAffinity: None
+  type: NodePort
